@@ -1,61 +1,70 @@
 #include <iostream>
-#include <chrono>
-#include <random>
 #include <vector>
+#include <chrono>
 #include <algorithm>
+#include <random>
+#include <cstdint>
 
-int main() {
-    using namespace std::chrono;
+using namespace std;
+using namespace std::chrono;
 
-    const int RUNS = 1000;
-    const int ITERATIONS = 1000000;
+volatile uint64_t sink = 0;
 
-    std::vector<double> times;
+uint64_t task1_work()
+{
+    random_device rd;
+    mt19937_64 gen(rd());
+    uniform_int_distribution<uint64_t> dist(100000, 999999);
 
-    std::mt19937_64 gen(0);
-    std::uniform_int_distribution<unsigned long long> dist(
-        1000000000ULL,
-        9999999999ULL
-    );
+    uint64_t a = dist(gen);
+    uint64_t b = dist(gen);
 
-    for (int r = 0; r < RUNS; r++) {
-        volatile unsigned long long result = 0;
+    uint64_t result = a * b;
+    sink = result;
 
+    return result;
+}
+
+int main()
+{
+    const int N = 10000;
+    vector<double> times_ns;
+
+    times_ns.reserve(N);
+
+    for (int i = 0; i < N; i++)
+    {
         auto start = high_resolution_clock::now();
 
-        for (int i = 0; i < ITERATIONS; i++) {
-            unsigned long long a = dist(gen);
-            unsigned long long b = dist(gen);
-            result = a * b;
-        }
+        task1_work();
 
         auto end = high_resolution_clock::now();
 
         double duration_ns =
             duration_cast<nanoseconds>(end - start).count();
 
-        double time_per_iteration_ns = duration_ns / ITERATIONS;
-        times.push_back(time_per_iteration_ns);
+        times_ns.push_back(duration_ns);
     }
 
-    std::sort(times.begin(), times.end());
+    sort(times_ns.begin(), times_ns.end());
 
-    double min_time = times.front();
-    double max_time = times.back();
-    double q1 = times[RUNS * 25 / 100];
-    double q2 = times[RUNS * 50 / 100];
-    double q3 = times[RUNS * 75 / 100];
+    double min_time = times_ns.front();
+    double max_time = times_ns.back();
+    double q1 = times_ns[N / 4];
+    double q2 = times_ns[N / 2];
+    double q3 = times_ns[(3 * N) / 4];
+    double wcet = max_time;
 
-    double wcet = max_time * 1.2;
-
-    std::cout << "Task tau1 WCET analysis" << std::endl;
-    std::cout << "All values are in nanoseconds per multiplication" << std::endl;
-    std::cout << "Min: " << min_time << " ns" << std::endl;
-    std::cout << "Max: " << max_time << " ns" << std::endl;
-    std::cout << "Q1: " << q1 << " ns" << std::endl;
-    std::cout << "Q2 Median: " << q2 << " ns" << std::endl;
-    std::cout << "Q3: " << q3 << " ns" << std::endl;
-    std::cout << "WCET: " << wcet << " ns" << std::endl;
+    cout << "========== TASK 1 EXECUTION TIME MEASUREMENTS ==========" << endl;
+    cout << "Number of executions: " << N << endl;
+    cout << "Time unit: nanoseconds (ns)" << endl;
+    cout << "Min:  " << min_time << " ns" << endl;
+    cout << "Q1:   " << q1 << " ns" << endl;
+    cout << "Q2:   " << q2 << " ns" << endl;
+    cout << "Q3:   " << q3 << " ns" << endl;
+    cout << "Max:  " << max_time << " ns" << endl;
+    cout << "WCET: " << wcet << " ns" << endl;
+    cout << "========================================================" << endl;
 
     return 0;
 }
